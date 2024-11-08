@@ -1,5 +1,5 @@
 // Replace with your Rivo API key
-const apiKey = 'XXXXXXXXXXXXXX';
+const apiKey = 'YOUR_API_KEY';
 
 // Function to update the HTML based on login status
 function updateDisplayBasedOnCustomerStatus() {
