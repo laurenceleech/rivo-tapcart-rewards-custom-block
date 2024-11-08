@@ -18,6 +18,8 @@ This Custom Loyalty Points and Rewards Block is designed to seamlessly integrate
 3. **Redemption Process**:
    - Customers can tap on rewards to redeem them.
    - The block shows a confirmation prompt and processes the redemption upon user confirmation.
+4. **Discount Application Process**:
+   - Customers can tap on their available rewards to apply the discount to their cart.
 
 ## Setup Instructions
 
