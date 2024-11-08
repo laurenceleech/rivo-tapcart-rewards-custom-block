@@ -1,6 +1,4 @@
-# rivo-tapcart-rewards-custom-block
-
-# Custom Loyalty Points and Rewards Block for Tapcart
+# Rivo Block for Tapcart
 
 ## Description
 This Custom Loyalty Points and Rewards Block is designed to seamlessly integrate with Tapcart to display customer points, available rewards, and store-wide reward options directly within your mobile app's interface. It enables users to view their loyalty points, see potential rewards, and redeem them without leaving the app.
