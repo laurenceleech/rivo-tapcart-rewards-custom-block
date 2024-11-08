@@ -7,6 +7,7 @@ This Custom Loyalty Points and Rewards Block is designed to seamlessly integrate
 - Displays current loyalty points balance.
 - Shows available and store-wide rewards.
 - Allows customers to redeem rewards directly from the app.
+- Allows customers to apply their avaialable rewards to their cart.
 - Supports Fixed rewards only - incremental rewards will not display.
 
 ## How This Block Works
