@@ -132,7 +132,7 @@ async function fetchStoreRewards() {
         const data = await response.json();
         const storeRewardsContainer = document.querySelector('.store-rewards');
 
-        const rewards = data.data.filter(reward => reward.attributes.source === 'points' && reward.attributes.points_type === 'fixed');
+        const rewards = data.data.filter(reward => reward.attributes.source === 'points' && reward.attributes.points_type === 'fixed' && reward.attributes.reward_type != 'free_product');
 
         if (rewards.length > 0) {
             let rewardCards = '';
