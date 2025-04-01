@@ -1,17 +1,21 @@
- <div class="footer-container"> 
-    <div id="points-toggle-container" onclick="toggleRewards()" style="display: none;">
-        <div id="points-balance">Loading points...</div>
-        <div id="toggle-message" class="toggle-message">Tap to view rewards</div>
-    </div>
-    <div id="expandable-content" class="hidden-content">
-        <hr>
-        <h3>Your available rewards</h3>
-        <div class="available-rewards">Loading available rewards...</div>
-        <hr>
-        <h3>Redeem rewards</h3>
-        <div class="store-rewards">Loading store rewards...</div>
-    </div>
-    <div id="logged-out-msg" style="display: none;">
-        ✨ <a href="javascript:void(0);" onclick="redirectToAccount()">Sign in</a> to spend your points!
-    </div>
-</div>
+    <div class="footer-container"> 
+        <div id="points-toggle-container" onclick="toggleRewards()" style="display: none;">
+            <div id="points-balance">
+                <div class="points-skeleton skeleton"></div>
+            </div>
+            <div id="toggle-message" class="toggle-message">
+                <div class="toggle-skeleton skeleton"></div>
+            </div>
+        </div>
+        <div id="expandable-content" class="hidden-content">
+            <hr>
+            <h3>Your available rewards</h3>
+            <div class="available-rewards">Loading available rewards...</div>
+            <hr>
+            <h3>Redeem rewards</h3>
+            <div class="store-rewards">Loading store rewards...</div>
+        </div>
+        <div id="logged-out-msg" style="display: none;">
+            ✨ <a href="javascript:void(0);" onclick="openAuthentication()">Sign in</a> to spend your points!
+        </div>
+    </div>  
