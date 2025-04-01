@@ -7,6 +7,10 @@ function updateDisplayBasedOnCustomerStatus() {
         document.getElementById('points-toggle-container').style.display = 'block';
         document.getElementById('logged-out-msg').style.display = 'none';
 
+        // Points balance and toggle message start with skeleton state
+        document.getElementById('points-balance').innerHTML = '<div class="points-skeleton skeleton"></div>';
+        document.getElementById('toggle-message').innerHTML = '<div class="toggle-skeleton skeleton"></div>';
+
         fetchCustomerPoints(Tapcart.variables.customer.id);
         fetchAvailableRewards(Tapcart.variables.customer.id);
         fetchStoreRewards(Tapcart.variables.customer.id);
@@ -24,77 +28,141 @@ async function fetchCustomerPoints(customerId) {
             headers: { Authorization: apiKey }
         });
 
-        const data = await response.json();
+        const data = await response.json(); 
         if (data && data.data && data.data.attributes) {
             pointsTally = data.data.attributes.points_tally;
-            document.getElementById('points-balance').textContent = `✨ You have ${pointsTally.toLocaleString()} points`;
+            // Replace skeleton with actual content
+            document.getElementById('points-balance').innerHTML = `✨ You have ${pointsTally.toLocaleString()} points`;
+            document.getElementById('toggle-message').innerHTML = 'Tap to view rewards';
         }
     } catch (error) {
         console.error('Error fetching customer points:', error);
+        // In case of error, show error state instead of skeleton
+        document.getElementById('points-balance').innerHTML = 'Unable to load points';
+        document.getElementById('toggle-message').innerHTML = 'Tap to retry';
     }
 }
 
+// Constants for pagination
+const REWARDS_PER_PAGE = 5;
+let availableRewardsPage = 1;
+let storeRewardsPage = 1;
+let allAvailableRewards = [];
+let allStoreRewards = [];
+
+// Function to create skeleton reward cards with dynamic count
+function createSkeletonRewards(count = 1) {
+    return Array(count).fill().map(() => `
+        <div class="reward-skeleton">
+            <div class="reward-title-skeleton skeleton"></div>
+            <div class="reward-subtitle-skeleton skeleton"></div>
+        </div>
+    `).join('');
+}
+
 // Function to fetch and display available rewards for the customer
-async function fetchAvailableRewards(customerId) {
+async function fetchAvailableRewards(customerId, expectedCount = 1) {
     const availableRewardsContainer = document.querySelector('.available-rewards');
-    let allRewards = [];
-    let currentPage = 1;
-    const perPage = 25;
-
+    const content = document.getElementById('expandable-content');
+    const toggleMessage = document.getElementById('toggle-message');
+    
+    // Store current toggle state
+    const wasExpanded = content.classList.contains('expanded');
+    
+    // Show initial skeleton with expected count
+    availableRewardsContainer.innerHTML = createSkeletonRewards(expectedCount);
+    
+    // Maintain correct toggle message during loading
+    if (wasExpanded) {
+        toggleMessage.textContent = 'Tap to collapse';
+    }
+    
     try {
-        let hasMorePages = true;
+        const response = await fetch(`https://developer-api.rivo.io/merchant_api/v1/points_redemptions?filters[customer_identifier]=${customerId}&filters[used]=false&filters[refunded_at]=null&filters[revoked_at]=null&sort[order_direction]=desc&sort[order_type]=applied_at&pagination[per_page]=100&pagination[page]=1`, {
+            method: 'GET',
+            headers: { Authorization: apiKey }
+        });
 
-        while (hasMorePages) {
-            const response = await fetch(`https://developer-api.rivo.io/merchant_api/v1/points_redemptions?filters[customer_identifier]=${customerId}&filters[used]=false&sort[order_direction]=desc&sort[order_type]=applied_at&pagination[per_page]=${perPage}&pagination[page]=${currentPage}`, {
-                method: 'GET',
-                headers: { Authorization: apiKey }
-            });
-
-            const data = await response.json();
-
-            if (data.data.length === 0) {
-                hasMorePages = false;
-                break;
-            }
-
-            allRewards = allRewards.concat(
-                data.data.filter(reward => reward.attributes.refunded_at === null && reward.attributes.revoked_at === null)
+        const data = await response.json();
+        
+        if (data.data && Array.isArray(data.data)) {
+            allAvailableRewards = data.data.filter(reward => 
+                !reward.attributes.refunded_at && 
+                !reward.attributes.revoked_at && 
+                !reward.attributes.used_at
             );
 
-            if (data.links && data.links.next) {
-                currentPage++;
+            if (allAvailableRewards.length > 0) {
+                displayAvailableRewardsPage();
+                
+                if (allAvailableRewards.length > REWARDS_PER_PAGE) {
+                    availableRewardsContainer.insertAdjacentHTML('afterend', 
+                        `<div class="show-more-btn" id="available-show-more" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">
+                            Show More (${REWARDS_PER_PAGE}/${allAvailableRewards.length})
+                        </div>`
+                    );
+                    
+                    document.getElementById('available-show-more').addEventListener('click', displayAvailableRewardsPage);
+                }
+                
+                // Ensure toggle message stays correct
+                if (wasExpanded) {
+                    toggleMessage.textContent = 'Tap to collapse';
+                }
             } else {
-                hasMorePages = false;
+                availableRewardsContainer.innerHTML = 'No available rewards at the moment.';
             }
-        }
-
-        if (allRewards.length > 0) {
-            let rewardCards = '';
-            allRewards.forEach(reward => {
-                const discountCode = reward.attributes.code;
-                const rewardName = reward.attributes.name;
-
-                console.log("Building card for reward:", rewardName);
-
-                rewardCards += `
-                    <div class="reward-card" id="reward-card-${reward.id}" onclick="applyRewardDiscount('${reward.id}', '${rewardName}', '${discountCode}')">
-                        <div class="reward-name">${rewardName}</div>
-                        <div class="reward-subtitle">Tap to apply to cart</div>
-                    </div>
-                `;
-            });
-
-            availableRewardsContainer.innerHTML = rewardCards.length > 0 
-                ? rewardCards 
-                : 'No available rewards at the moment.';
-            console.log("Updated available rewards container with cards.");
         } else {
-            console.log("No available rewards found.");
+            availableRewardsContainer.innerHTML = 'No available rewards at the moment.';
         }
-
     } catch (error) {
         console.error('Error fetching available rewards:', error);
+        availableRewardsContainer.innerHTML = 'Unable to load rewards. Please try again later.';
     }
+    
+    // Final check to ensure toggle message is correct
+    if (wasExpanded) {
+        toggleMessage.textContent = 'Tap to collapse';
+    }
+}
+
+// Function to display a page of available rewards
+function displayAvailableRewardsPage() {
+    const container = document.querySelector('.available-rewards');
+    const content = document.getElementById('expandable-content');
+    const toggleMessage = document.getElementById('toggle-message');
+    const startIdx = (availableRewardsPage - 1) * REWARDS_PER_PAGE;
+    const endIdx = startIdx + REWARDS_PER_PAGE;
+    const pageRewards = allAvailableRewards.slice(startIdx, endIdx);
+    
+    const rewardCards = pageRewards.map(reward => `
+        <div class="reward-card" id="reward-card-${reward.id}" onclick="applyRewardDiscount('${reward.id}', '${reward.attributes.name}', '${reward.attributes.code}')">
+            <div class="reward-name">${reward.attributes.name}</div>
+            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Tap to apply to checkout</div>
+        </div>
+    `).join('');
+
+    if (availableRewardsPage === 1) {
+        container.innerHTML = rewardCards;
+    } else {
+        container.innerHTML += rewardCards;
+    }
+
+    // Maintain correct toggle message if content is expanded
+    if (content.classList.contains('expanded')) {
+        toggleMessage.textContent = 'Tap to collapse';
+    }
+
+    const showMoreBtn = document.getElementById('available-show-more');
+    if (showMoreBtn) {
+        if (endIdx >= allAvailableRewards.length) {
+            showMoreBtn.style.display = 'none';
+        } else {
+            showMoreBtn.textContent = `Show More (${endIdx}/${allAvailableRewards.length})`;
+        }
+    }
+
+    availableRewardsPage++;
 }
 
 // Register the event handler for customer status updates
@@ -115,14 +183,17 @@ const timeoutMap = {};
 const customerId = Tapcart.variables.customer.id;
 
 // Function to redirect to account page
-function redirectToAccount() {
-    Tapcart.actions.openScreen({
-        destination: { type: "internal", url: "/account" }
-    });
+function openAuthentication() {
+    Tapcart.actions.openAuthentication();
 }
 
 // Function to fetch and display store rewards
 async function fetchStoreRewards() {
+    const storeRewardsContainer = document.querySelector('.store-rewards');
+    
+    // Show skeleton loading state
+    storeRewardsContainer.innerHTML = createSkeletonRewards();
+    
     try {
         const response = await fetch('https://developer-api.rivo.io/merchant_api/v1/rewards', {
             method: 'GET',
@@ -130,35 +201,72 @@ async function fetchStoreRewards() {
         });
 
         const data = await response.json();
-        const storeRewardsContainer = document.querySelector('.store-rewards');
 
-        const rewards = data.data.filter(reward => reward.attributes.source === 'points' && reward.attributes.points_type === 'fixed' && reward.attributes.reward_type != 'free_product');
+        allStoreRewards = data.data.filter(reward => 
+            reward.attributes.source === 'points' && 
+            reward.attributes.points_type === 'fixed' && 
+            reward.attributes.reward_type != 'free_product'
+        );
 
-        if (rewards.length > 0) {
-            let rewardCards = '';
-            rewards.forEach(reward => {
-                const rewardName = reward.attributes.name;
-                const pointsAmount = reward.attributes.points_amount;
-
-                rewardCards += `
-                    <div class="reward-card" id="store-reward-${reward.id}">
-                        <div class="reward-name">${rewardName}</div>
-                        <div class="reward-subtitle">${pointsAmount} points</div>
-                    </div>
-                `;
-            });
-            storeRewardsContainer.innerHTML = rewardCards;
-
-            rewards.forEach(reward => {
-                const rewardCard = document.getElementById(`store-reward-${reward.id}`);
-                rewardCard.addEventListener('click', () => handleRedeemRewardClick(reward.id, reward.attributes.name, reward.attributes.points_amount));
-            });
+        if (allStoreRewards.length > 0) {
+            displayStoreRewardsPage();
+            
+            if (allStoreRewards.length > REWARDS_PER_PAGE) {
+                storeRewardsContainer.insertAdjacentHTML('afterend', 
+                    `<div class="show-more-btn" id="store-show-more" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">
+                        Show More (${REWARDS_PER_PAGE}/${allStoreRewards.length})
+                    </div>`
+                );
+                
+                document.getElementById('store-show-more').addEventListener('click', displayStoreRewardsPage);
+            }
         } else {
             storeRewardsContainer.textContent = 'No rewards available in the store.';
         }
     } catch (error) {
         console.error('Error fetching store rewards:', error);
+        storeRewardsContainer.innerHTML = 'Unable to load store rewards. Please try again later.';
     }
+}
+
+// Function to display a page of store rewards
+function displayStoreRewardsPage() {
+    const container = document.querySelector('.store-rewards');
+    const startIdx = (storeRewardsPage - 1) * REWARDS_PER_PAGE;
+    const endIdx = startIdx + REWARDS_PER_PAGE;
+    const pageRewards = allStoreRewards.slice(startIdx, endIdx);
+    
+    const rewardCards = pageRewards.map(reward => `
+        <div class="reward-card" id="store-reward-${reward.id}">
+            <div class="reward-name">${reward.attributes.name}</div>
+            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">${reward.attributes.points_amount} points</div>
+        </div>
+    `).join('');
+
+    if (storeRewardsPage === 1) {
+        container.innerHTML = rewardCards;
+    } else {
+        container.innerHTML += rewardCards;
+    }
+
+    // Add click handlers for the new cards
+    pageRewards.forEach(reward => {
+        const rewardCard = document.getElementById(`store-reward-${reward.id}`);
+        rewardCard.addEventListener('click', () => 
+            handleRedeemRewardClick(reward.id, reward.attributes.name, reward.attributes.points_amount)
+        );
+    });
+
+    const showMoreBtn = document.getElementById('store-show-more');
+    if (showMoreBtn) {
+        if (endIdx >= allStoreRewards.length) {
+            showMoreBtn.style.display = 'none';
+        } else {
+            showMoreBtn.textContent = `Show More (${endIdx}/${allStoreRewards.length})`;
+        }
+    }
+
+    storeRewardsPage++;
 }
 
 // Function to disable all reward cards
@@ -188,8 +296,8 @@ async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
         rewardCard.innerHTML = `
             <div>Redeem ${rewardName}?</div>
             <div class="confirm-buttons">
-                <button id="confirm-${rewardId}">Yes</button>
-                <button id="cancel-${rewardId}">No</button>
+                 <button id="confirm-${rewardId}" style="background-color: ${Tapcart.variables.theme.tokens.colors.buttonColors.primaryFill}; color: ${Tapcart.variables.theme.tokens.colors.buttonColors.primaryText}">Yes</button>
+        <button id="cancel-${rewardId}" style="background-color: ${Tapcart.variables.theme.tokens.colors.buttonColors.secondaryFill}; color: ${Tapcart.variables.theme.tokens.colors.buttonColors.secondaryText}">No</button>
             </div>
         `;
 
@@ -213,7 +321,7 @@ async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
     } else {
         rewardCard.innerHTML = `
             <div class="reward-name">${rewardName}</div>
-            <div class="reward-subtitle">Not enough points</div>
+            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Not enough points</div>
         `;
         setTimeout(() => {
             revertRewardCard(rewardId, rewardName, pointsAmount);
@@ -221,7 +329,7 @@ async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
     }
 }
 
-// Confirm reward redemption
+// Function to confirm reward redemption
 async function confirmRedemption(rewardId, rewardName, pointsAmount) {
     const rewardCard = document.getElementById(`store-reward-${rewardId}`);
     disableAllCards();
@@ -244,17 +352,38 @@ async function confirmRedemption(rewardId, rewardName, pointsAmount) {
 
         if (data && data.data && data.data.id) {
             rewardCard.innerHTML = `<div>Success!</div>`;
-            fetchAvailableRewards(Tapcart.variables.customer.id);
-            fetchCustomerPoints(Tapcart.variables.customer.id);
-            setTimeout(() => {
+            
+            // Reset available rewards page counter
+            availableRewardsPage = 1;
+            
+            // Calculate expected number of skeleton items (current + 1, max of 5)
+            const currentRewardsCount = allAvailableRewards.length;
+            const expectedSkeletonCount = Math.min(currentRewardsCount + 1, 5);
+            
+            // Show skeleton loading state in available rewards
+            const availableRewardsContainer = document.querySelector('.available-rewards');
+            if (availableRewardsContainer) {
+                availableRewardsContainer.innerHTML = createSkeletonRewards(expectedSkeletonCount);
+            }
+            
+            // Remove any existing "Show More" button
+            const showMoreBtn = document.getElementById('available-show-more');
+            if (showMoreBtn) {
+                showMoreBtn.remove();
+            }
+            
+            setTimeout(async () => {
+                await fetchCustomerPoints(Tapcart.variables.customer.id);
+                await fetchAvailableRewards(Tapcart.variables.customer.id, expectedSkeletonCount);
                 revertRewardCard(rewardId, rewardName, pointsAmount);
                 enableAllCards();
-            }, 3000); // 3 seconds delay
+            }, 1000);
         } else {
             rewardCard.innerHTML = `<div>Error redeeming reward</div>`;
             enableAllCards();
         }
     } catch (error) {
+        console.error('Error in reward redemption:', error);
         rewardCard.innerHTML = `<div>Failed to redeem reward</div>`;
         enableAllCards();
     }
@@ -265,7 +394,7 @@ function revertRewardCard(rewardId, rewardName, pointsAmount) {
     const rewardCard = document.getElementById(`store-reward-${rewardId}`);
     rewardCard.innerHTML = `
         <div class="reward-name">${rewardName}</div>
-        <div class="reward-subtitle">${pointsAmount} points</div>
+        <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">${pointsAmount} points</div>
     `;
 
     if (timeoutMap[rewardId]) {
@@ -287,12 +416,12 @@ function cancelRedemption(rewardId, rewardName, pointsAmount) {
 function applyRewardDiscount(rewardId, rewardName, discountCode) {
     Tapcart.actions.applyDiscount({ discountCode: discountCode });
     const rewardCard = document.getElementById(`reward-card-${rewardId}`);
-    rewardCard.innerHTML = `<div class="reward-applied">Discount applied</div>`;
+    rewardCard.innerHTML = `<div class="reward-applied" style="color: ${Tapcart.variables.theme.tokens.colors.stateColors.success}">${rewardName} will be applied at checkout.</div>`;
 
     setTimeout(() => {
         rewardCard.innerHTML = `
             <div class="reward-name">${rewardName}</div>
-            <div class="reward-subtitle">Tap to apply to cart</div>
+            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Tap to apply to checkout</div>
         `;
     }, 3000);
 }
@@ -303,4 +432,79 @@ function toggleRewards() {
     const toggleMessage = document.getElementById('toggle-message');
     content.classList.toggle('expanded');
     toggleMessage.textContent = content.classList.contains('expanded') ? 'Tap to collapse' : 'Tap to view rewards';
+
+    // If collapsing, reset the pagination and refresh the rewards display
+    if (!content.classList.contains('expanded')) {
+        // Reset page counters
+        availableRewardsPage = 1;
+        storeRewardsPage = 1;
+
+        // Clear existing rewards displays
+        const availableRewardsContainer = document.querySelector('.available-rewards');
+        const storeRewardsContainer = document.querySelector('.store-rewards');
+        
+        // Remove existing "Show More" buttons if they exist
+        const availableShowMore = document.getElementById('available-show-more');
+        const storeShowMore = document.getElementById('store-show-more');
+        if (availableShowMore) availableShowMore.remove();
+        if (storeShowMore) storeShowMore.remove();
+
+        // Re-display first page of rewards
+        if (allAvailableRewards.length > 0) {
+            displayAvailableRewardsPage();
+            // Re-add "Show More" button for available rewards if needed
+            if (allAvailableRewards.length > REWARDS_PER_PAGE) {
+                availableRewardsContainer.insertAdjacentHTML('afterend', 
+                    `<div class="show-more-btn" id="available-show-more" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">
+                        Show More (${REWARDS_PER_PAGE}/${allAvailableRewards.length})
+                    </div>`
+                );
+                document.getElementById('available-show-more').addEventListener('click', displayAvailableRewardsPage);
+            }
+        }
+        if (allStoreRewards.length > 0) {
+            displayStoreRewardsPage();
+            // Re-add "Show More" button for store rewards if needed
+            if (allStoreRewards.length > REWARDS_PER_PAGE) {
+                storeRewardsContainer.insertAdjacentHTML('afterend', 
+                    `<div class="show-more-btn" id="store-show-more" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">
+                        Show More (${REWARDS_PER_PAGE}/${allStoreRewards.length})
+                    </div>`
+                );
+                document.getElementById('store-show-more').addEventListener('click', displayStoreRewardsPage);
+            }
+        }
+    }
 }
+ 
+
+function applyCustomStyles() {
+    const theme = Tapcart.variables.theme.tokens.colors;
+
+    // background colors
+    document.querySelector('#points-toggle-container').style.backgroundColor = theme.coreColors.pageColor;
+    document.querySelector('.footer-container').style.backgroundColor = theme.coreColors.pageColor;
+    document.querySelector('.reward-card').style.backgroundColor = theme.coreColors.pageColor;
+ 
+    // border colors
+    document.querySelector('.reward-skeleton').style.borderColor = theme.coreColors.dividingLines;
+
+    const confirmButtons = document.querySelectorAll('.confirm-buttons button');
+    confirmButtons.forEach(button => {
+        button.style.borderColor = theme.coreColors.dividingLines;
+    });
+
+    if (theme.buttonColors.primaryOutlineEnabled) {
+        document.querySelector('.footer-container').style.borderColor = theme.buttonColors.primaryOutlineColor;
+        document.querySelector('.reward-card').style.borderColor = theme.buttonColors.primaryOutlineColor;
+    } else if (theme.buttonColors.secondaryOutlineEnabled) {
+        document.querySelector('.footer-container').style.borderColor = theme.buttonColors.secondaryOutlineColor;
+        document.querySelector('.reward-card').style.borderColor = theme.buttonColors.secondaryOutlineColor;
+    } else {
+        document.querySelector('.footer-container').style.borderColor = theme.coreColors.dividingLines;
+        document.querySelector('.reward-card').style.borderColor = theme.coreColors.dividingLines;
+    }
+
+}
+
+applyCustomStyles();
