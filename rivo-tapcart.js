@@ -134,11 +134,12 @@ function displayAvailableRewardsPage() {
     const startIdx = (availableRewardsPage - 1) * REWARDS_PER_PAGE;
     const endIdx = startIdx + REWARDS_PER_PAGE;
     const pageRewards = allAvailableRewards.slice(startIdx, endIdx);
+    const theme = Tapcart.variables.theme.tokens.colors;
     
     const rewardCards = pageRewards.map(reward => `
         <div class="reward-card" id="reward-card-${reward.id}" onclick="applyRewardDiscount('${reward.id}', '${reward.attributes.name}', '${reward.attributes.code}')">
-            <div class="reward-name">${reward.attributes.name}</div>
-            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Tap to apply to checkout</div>
+            <div class="reward-name" style="color: ${theme.textColors.primaryColor}">${reward.attributes.name}</div>
+            <div class="reward-subtitle" style="color: ${theme.textColors.secondaryColor}">Tap to apply to checkout</div>
         </div>
     `).join('');
 
@@ -147,6 +148,9 @@ function displayAvailableRewardsPage() {
     } else {
         container.innerHTML += rewardCards;
     }
+
+    // Apply styles to the newly created reward cards
+    styleRewardCards();
 
     // Maintain correct toggle message if content is expanded
     if (content.classList.contains('expanded')) {
@@ -235,11 +239,12 @@ function displayStoreRewardsPage() {
     const startIdx = (storeRewardsPage - 1) * REWARDS_PER_PAGE;
     const endIdx = startIdx + REWARDS_PER_PAGE;
     const pageRewards = allStoreRewards.slice(startIdx, endIdx);
+    const theme = Tapcart.variables.theme.tokens.colors;
     
     const rewardCards = pageRewards.map(reward => `
         <div class="reward-card" id="store-reward-${reward.id}">
-            <div class="reward-name">${reward.attributes.name}</div>
-            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">${reward.attributes.points_amount} points</div>
+            <div class="reward-name" style="color: ${theme.textColors.primaryColor}">${reward.attributes.name}</div>
+            <div class="reward-subtitle" style="color: ${theme.textColors.secondaryColor}">${reward.attributes.points_amount} points</div>
         </div>
     `).join('');
 
@@ -248,6 +253,9 @@ function displayStoreRewardsPage() {
     } else {
         container.innerHTML += rewardCards;
     }
+
+    // Apply styles to the newly created reward cards
+    styleRewardCards();
 
     // Add click handlers for the new cards
     pageRewards.forEach(reward => {
@@ -284,6 +292,7 @@ function enableAllCards() {
 // Function to handle reward card click for redemption confirmation
 async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
     const rewardCard = document.getElementById(`store-reward-${rewardId}`);
+    const theme = Tapcart.variables.theme.tokens.colors;
 
     if (rewardCard.classList.contains('disabled')) return;
 
@@ -294,10 +303,10 @@ async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
 
     if (pointsTally >= pointsAmount) {
         rewardCard.innerHTML = `
-            <div>Redeem ${rewardName}?</div>
+            <div style="color: ${theme.textColors.primaryColor}">Redeem ${rewardName}?</div>
             <div class="confirm-buttons">
-                 <button id="confirm-${rewardId}" style="background-color: ${Tapcart.variables.theme.tokens.colors.buttonColors.primaryFill}; color: ${Tapcart.variables.theme.tokens.colors.buttonColors.primaryText}">Yes</button>
-        <button id="cancel-${rewardId}" style="background-color: ${Tapcart.variables.theme.tokens.colors.buttonColors.secondaryFill}; color: ${Tapcart.variables.theme.tokens.colors.buttonColors.secondaryText}">No</button>
+                 <button id="confirm-${rewardId}" style="background-color: ${theme.buttonColors.primaryFill}; color: ${theme.buttonColors.primaryText}">Yes</button>
+                 <button id="cancel-${rewardId}" style="background-color: ${theme.buttonColors.secondaryFill}; color: ${theme.buttonColors.secondaryText}">No</button>
             </div>
         `;
 
@@ -320,8 +329,8 @@ async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
         }, 20000); // 20 seconds
     } else {
         rewardCard.innerHTML = `
-            <div class="reward-name">${rewardName}</div>
-            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Not enough points</div>
+            <div class="reward-name" style="color: ${theme.textColors.primaryColor}">${rewardName}</div>
+            <div class="reward-subtitle" style="color: ${theme.textColors.secondaryColor}">Not enough points</div>
         `;
         setTimeout(() => {
             revertRewardCard(rewardId, rewardName, pointsAmount);
@@ -333,7 +342,7 @@ async function handleRedeemRewardClick(rewardId, rewardName, pointsAmount) {
 async function confirmRedemption(rewardId, rewardName, pointsAmount) {
     const rewardCard = document.getElementById(`store-reward-${rewardId}`);
     disableAllCards();
-    rewardCard.innerHTML = `<div>Redeeming...</div>`;
+    rewardCard.innerHTML = `<div style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Redeeming...</div>`;
 
     try {
         const response = await fetch('https://developer-api.rivo.io/merchant_api/v1/points_redemptions', {
@@ -351,7 +360,7 @@ async function confirmRedemption(rewardId, rewardName, pointsAmount) {
         const data = await response.json();
 
         if (data && data.data && data.data.id) {
-            rewardCard.innerHTML = `<div>Success!</div>`;
+            rewardCard.innerHTML = `<div style="color: ${Tapcart.variables.theme.tokens.colors.stateColors.success}">Success!</div>`;
             
             // Reset available rewards page counter
             availableRewardsPage = 1;
@@ -379,7 +388,7 @@ async function confirmRedemption(rewardId, rewardName, pointsAmount) {
                 enableAllCards();
             }, 1000);
         } else {
-            rewardCard.innerHTML = `<div>Error redeeming reward</div>`;
+            rewardCard.innerHTML = `<div style="color: ${Tapcart.variables.theme.tokens.colors.stateColors.error}">Error redeeming reward</div>`;
             enableAllCards();
         }
     } catch (error) {
@@ -392,9 +401,11 @@ async function confirmRedemption(rewardId, rewardName, pointsAmount) {
 // Function to revert the card to its initial state
 function revertRewardCard(rewardId, rewardName, pointsAmount) {
     const rewardCard = document.getElementById(`store-reward-${rewardId}`);
+    const theme = Tapcart.variables.theme.tokens.colors;
+    
     rewardCard.innerHTML = `
-        <div class="reward-name">${rewardName}</div>
-        <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">${pointsAmount} points</div>
+        <div class="reward-name" style="color: ${theme.textColors.primaryColor}">${rewardName}</div>
+        <div class="reward-subtitle" style="color: ${theme.textColors.secondaryColor}">${pointsAmount} points</div>
     `;
 
     if (timeoutMap[rewardId]) {
@@ -414,16 +425,19 @@ function cancelRedemption(rewardId, rewardName, pointsAmount) {
 
 // Function to apply the discount code and temporarily show the "Discount applied" message
 function applyRewardDiscount(rewardId, rewardName, discountCode) {
+    const theme = Tapcart.variables.theme.tokens.colors;
+      console.log("Clicked!")
+    Tapcart.actions.action("trigger/haptic")
     Tapcart.actions.applyDiscount({ discountCode: discountCode });
     const rewardCard = document.getElementById(`reward-card-${rewardId}`);
-    rewardCard.innerHTML = `<div class="reward-applied" style="color: ${Tapcart.variables.theme.tokens.colors.stateColors.success}">${rewardName} will be applied at checkout.</div>`;
+    rewardCard.innerHTML = `<div class="reward-applied" style="color: ${theme.stateColors.success}">${rewardName} applied! <br>View your savings at checkout.</div>`;
 
     setTimeout(() => {
         rewardCard.innerHTML = `
-            <div class="reward-name">${rewardName}</div>
-            <div class="reward-subtitle" style="color: ${Tapcart.variables.theme.tokens.colors.textColors.secondaryColor}">Tap to apply to checkout</div>
+            <div class="reward-name" style="color: ${theme.textColors.primaryColor}">${rewardName}</div>
+            <div class="reward-subtitle" style="color: ${theme.textColors.secondaryColor}">Tap to apply to checkout</div>
         `;
-    }, 3000);
+    }, 5000);
 }
 
 // Function to toggle the visibility of the rewards section
@@ -481,12 +495,18 @@ function toggleRewards() {
 function applyCustomStyles() {
     const theme = Tapcart.variables.theme.tokens.colors;
 
-    // background colors
     document.querySelector('#points-toggle-container').style.backgroundColor = theme.coreColors.pageColor;
     document.querySelector('.footer-container').style.backgroundColor = theme.coreColors.pageColor;
-    document.querySelector('.reward-card').style.backgroundColor = theme.coreColors.pageColor;
- 
-    // border colors
+
+    document.querySelector('#points-balance').style.color = theme.textColors.pageTitle;
+    document.querySelector('#logged-out-msg').style.color = theme.textColors.pageTitle;
+    document.querySelector('#toggle-message').style.color = theme.textColors.secondaryColor;
+
+    const sectionTitles = document.querySelectorAll('.rewards-section-title');
+    sectionTitles.forEach(title => {
+        title.style.color = theme.textColors.pageTitle;
+    });
+  
     document.querySelector('.reward-skeleton').style.borderColor = theme.coreColors.dividingLines;
 
     const confirmButtons = document.querySelectorAll('.confirm-buttons button');
@@ -496,15 +516,33 @@ function applyCustomStyles() {
 
     if (theme.buttonColors.primaryOutlineEnabled) {
         document.querySelector('.footer-container').style.borderColor = theme.buttonColors.primaryOutlineColor;
-        document.querySelector('.reward-card').style.borderColor = theme.buttonColors.primaryOutlineColor;
     } else if (theme.buttonColors.secondaryOutlineEnabled) {
         document.querySelector('.footer-container').style.borderColor = theme.buttonColors.secondaryOutlineColor;
-        document.querySelector('.reward-card').style.borderColor = theme.buttonColors.secondaryOutlineColor;
     } else {
         document.querySelector('.footer-container').style.borderColor = theme.coreColors.dividingLines;
-        document.querySelector('.reward-card').style.borderColor = theme.coreColors.dividingLines;
     }
+}
 
+function styleRewardCards() {
+    const theme = Tapcart.variables.theme.tokens.colors;
+    const rewardCards = document.querySelectorAll('.reward-card');
+    
+    rewardCards.forEach(card => {
+        card.style.backgroundColor = theme.coreColors.pageColor;
+        
+        if (theme.buttonColors.primaryOutlineEnabled) {
+            card.style.borderColor = theme.buttonColors.primaryOutlineColor;
+        } else if (theme.buttonColors.secondaryOutlineEnabled) {
+            card.style.borderColor = theme.buttonColors.secondaryOutlineColor;
+        } else {
+            card.style.borderColor = theme.coreColors.dividingLines;
+        }
+
+        const subtitle = card.querySelector('.reward-subtitle');
+        if (subtitle) {
+            subtitle.style.color = theme.textColors.secondaryColor;
+        }
+    });
 }
 
 applyCustomStyles();
